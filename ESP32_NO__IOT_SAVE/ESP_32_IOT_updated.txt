@@ -1,0 +1,189 @@
+#define RAIN_PIN 5 // rain sensor
+#define D5 21 // D5 pin as 21 SDA
+#define D6 22 // D6 pin as 22 SCL
+#define DHT_PIN 4 // DHT sensor
+#define DHT_TYPE DHT11 
+
+#define pump1 25
+#define pump2 23
+#define R_motor1 13
+
+#define BLYNK_TEMPLATE_ID "TMPLGd9BtlvP"
+#define BLYNK_TEMPLATE_NAME "VPIN"
+#define BLYNK_AUTH_TOKEN "aIJRvLpcE7uVzU1npY6v5yaCEvsSUq9u"
+
+#include <RTClib.h>
+#include <DHT.h> 
+#include <Wire.h>
+#include <BlynkSimpleEsp32.h>
+
+DHT dht(DHT_PIN, DHT_TYPE); 
+RTC_DS1307 rtc;
+
+int sw1 ;
+int sw2 ;
+int sw3 ;
+int builtinled = 2;
+
+
+
+int endday1;
+int endday2;
+
+
+char auth[] = BLYNK_AUTH_TOKEN;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(RAIN_PIN, INPUT_PULLUP); 
+  pinMode(pump1, OUTPUT); 
+  pinMode(builtinled, OUTPUT);
+  pinMode(pump2, OUTPUT); 
+  pinMode(R_motor1,OUTPUT);
+  
+  if (!rtc.begin()) { 
+    Serial.println("Couldn't find RTC");
+    while (1);
+  }
+
+  DateTime now = rtc.now(); // get the current date and time from the RTC module
+  if (now.year() <= 2000) { // check if the RTC module has lost power
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__))); // set the RTC to the date and time when the sketch was compiled
+    Serial.println("RTC lost power, setting to compiled time");
+  }
+
+  Blynk.begin(auth, "C-G3-3500", "123456788");
+}
+
+void loop() {
+  Blynk.run();
+  delay(10);
+  rainsensor();
+  float temperature = dht.readTemperature(); // read temperature from DHT sensor
+  float humidity = dht.readHumidity(); // read humidity from DHT sensor
+
+  if (isnan(temperature) || isnan(humidity)) { // check if the readings are valid
+    Serial.println("Failed to read from DHT sensor!");
+  } else {
+    Serial.print("Temperature: ");
+    Serial.print(temperature);
+    Serial.println(" °C");
+
+    Serial.print("Humidity: ");
+    Serial.print(humidity);
+    Serial.println(" %");
+
+      DateTime now = rtc.now(); // get the current date and time
+      
+  Serial.print(now.year(), DEC); // print year
+  Serial.print('/');
+  printDigits(now.month()); // print month
+  Serial.print('/');
+  printDigits(now.day()); // print day
+  Serial.print(' ');
+  printDigits(now.hour()); // print hour
+  Serial.print(':');
+  printDigits(now.minute()); // print minute
+  Serial.print(':');
+  printDigits(now.second()); // print second
+  Serial.println(); // print newline
+  delay(1000); // wait for 1 second
+
+    Blynk.virtualWrite(V14, temperature); // write temperature to virtual pin V1 in Blynk app
+    Blynk.virtualWrite(V15, humidity); // write humidity to virtual pin V2 in Blynk app
+  }
+
+  delay(2000);
+
+  DateTime now = rtc.now();
+
+  if(sw1== 1)
+  {
+  // Check if it's time to turn on the motor1
+  int startDay = now.hour() + endday1; // Start on the 7th day from today
+  if (now.day() >= startDay && now.hour() == 8 && now.minute() == 0 && now.second() == 0) {
+    // Code to turn on the motor goes here
+    digitalWrite(pump1, HIGH);
+  }
+
+  // Check if it's time to turn off the motor
+  if (now.hour() == 18 && now.minute() == 0 && now.second() == 0) {
+    // Code to turn off the motor goes here
+    digitalWrite(pump1, LOW);
+  }
+  }
+  else
+  Serial.println("PUMP IS OFF");
+
+
+  if(sw2== 1)
+  {
+   // Check if it's time to turn on the motor2
+  int startDay2 = now.hour() + endday2; // Start on the 7th day from today
+  if (now.day() >= startDay2 && now.hour() == 8 && now.minute() == 0 && now.second() == 0) {
+    // Code to turn on the motor goes here
+    digitalWrite(pump2, HIGH);
+  }
+
+  // Check if it's time to turn off the motor
+  if (now.hour() == 18 && now.minute() == 0 && now.second() == 0) {
+    // Code to turn off the motor goes here
+    digitalWrite(pump2, LOW);
+  }
+}else
+ Serial.println("PUMP IS OFF");
+}
+
+
+void printDigits(int digits) {
+  if (digits < 10) {
+ Serial.print('0'); // add a leading zero if necessary
+  }
+ Serial.print(digits);
+}
+
+void rainsensor()
+{
+ int rainState = digitalRead(RAIN_PIN);
+
+  if (rainState == LOW) {
+    Serial.println("Rain detected!");
+    digitalWrite(R_motor1,HIGH);
+  } else {
+    Serial.println("No rain detected.");
+    digitalWrite(R_motor1, LOW);
+  }
+  
+  delay(1000);
+}
+
+BLYNK_WRITE(V0)
+{
+  sw1 = param.asInt();
+  digitalWrite(2,sw1);
+  digitalWrite(pump1,sw1);
+}
+
+BLYNK_WRITE(V1)
+{
+   sw2 = param.asInt();
+    digitalWrite(2,sw2);
+    digitalWrite(pump2,sw2);
+}
+
+BLYNK_WRITE(V3)
+{
+   sw3 = param.asInt();
+    digitalWrite(2,sw3);
+}
+
+BLYNK_WRITE(V10)
+{
+   endday1 = param.asInt();
+   Serial.println(endday1);
+}
+BLYNK_WRITE(V11)
+{
+   endday2 = param.asInt();
+   Serial.println(endday2);
+}
